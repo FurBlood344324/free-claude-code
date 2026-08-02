@@ -1,5 +1,6 @@
 """Shared process helpers for installed client CLI launchers."""
 
+import os
 import shutil
 import subprocess
 import sys
@@ -92,3 +93,20 @@ def run_client_process(
             unregister_pid(process.pid)
 
     raise SystemExit(return_code)
+
+
+def clear_terminal() -> None:
+    """Clear an interactive terminal without making it a launch prerequisite."""
+
+    if not sys.stdout.isatty():
+        return
+    try:
+        subprocess.run(
+            ["clear"],
+            check=False,
+            env=os.environ.copy(),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return

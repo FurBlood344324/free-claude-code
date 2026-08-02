@@ -12,11 +12,21 @@ claude-code
 Bu komut FCC server'ı gerektiğinde başlatır, Claude Code'u proxy üzerinden çalıştırır
 ve son oturum kapandığında kendi başlattığı server'ı durdurur.
 
+Pi Coding Agent'ı da aynı şekilde çalıştırılabilir:
+
+```text
+pi-code
+```
+
+`pi-code`, `claude-code` ile aynı yaşam döngüsünü izler: FCC server'ı gerektiğinde
+başlatır, Pi'yi proxy üzerinden çalıştırır ve son oturum kapandığında kendi başlattığı
+server'ı durdurur.
+
 ## Gereksinimler
 
 - Python 3.14
 - [uv](https://docs.astral.sh/uv/)
-- Claude Code
+- Claude Code ve/veya [Pi Coding Agent](https://pi.dev)
 - Bir model sağlayıcısı ve gerekiyorsa API anahtarı
 
 ## Kurulum
@@ -125,6 +135,14 @@ wrapper'dır. Manuel server yönetmek istersen:
 ```bash
 fcc-server
 fcc-claude
+```
+
+Pi agent'ı için aynı şekilde `pi-code` wrapper'ı kullanılır; manuel server yönetmek
+istersen:
+
+```bash
+fcc-server
+fcc-pi
 ```
 
 ## İlk ayar

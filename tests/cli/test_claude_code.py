@@ -168,7 +168,7 @@ def test_claude_code_launcher_delegates_and_releases() -> None:
             claude_code, "local_proxy_root_url", return_value="http://127.0.0.1:8082"
         ),
         patch.object(claude_code, "acquire_server_session", return_value=session),
-        patch.object(claude_code, "_clear_terminal"),
+        patch.object(claude_code, "clear_terminal"),
         patch.object(claude_code, "launch_claude", side_effect=SystemExit(7)) as launch,
         pytest.raises(SystemExit, match="7"),
     ):
@@ -179,18 +179,18 @@ def test_claude_code_launcher_delegates_and_releases() -> None:
 
 
 def test_signal_cleanup_stops_child_and_releases_session() -> None:
-    from free_claude_code.cli.launchers import claude_code
+    from free_claude_code.cli.launchers import server_session
 
     session = MagicMock()
     with (
-        patch.object(claude_code, "kill_all_best_effort") as kill_children,
-        patch.object(claude_code.signal, "getsignal", return_value=None),
-        patch.object(claude_code.signal, "signal") as install_signal,
-        claude_code._cleanup_on_signal(session),
+        patch.object(server_session, "kill_all_best_effort") as kill_children,
+        patch.object(server_session.signal, "getsignal", return_value=None),
+        patch.object(server_session.signal, "signal") as install_signal,
+        server_session.cleanup_on_signal(session),
     ):
         handler = install_signal.call_args_list[0].args[1]
         with pytest.raises(SystemExit, match="130"):
-            handler(claude_code.signal.SIGINT, None)
+            handler(server_session.signal.SIGINT, None)
 
     kill_children.assert_called_once_with()
     session.release.assert_called_once_with()
@@ -198,17 +198,17 @@ def test_signal_cleanup_stops_child_and_releases_session() -> None:
 
 
 def test_signal_cleanup_is_idempotent_with_outer_release() -> None:
-    from free_claude_code.cli.launchers import claude_code
+    from free_claude_code.cli.launchers import server_session
 
     session = MagicMock()
     with (
-        patch.object(claude_code, "kill_all_best_effort"),
-        patch.object(claude_code.signal, "getsignal", return_value=None),
-        patch.object(claude_code.signal, "signal") as install_signal,
-        claude_code._cleanup_on_signal(session),
+        patch.object(server_session, "kill_all_best_effort"),
+        patch.object(server_session.signal, "getsignal", return_value=None),
+        patch.object(server_session.signal, "signal") as install_signal,
+        server_session.cleanup_on_signal(session),
     ):
         handler = install_signal.call_args_list[0].args[1]
         with pytest.raises(SystemExit):
-            handler(claude_code.signal.SIGTERM, None)
+            handler(server_session.signal.SIGTERM, None)
 
     session.release.assert_called_once_with()

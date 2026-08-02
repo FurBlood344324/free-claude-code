@@ -64,6 +64,23 @@ def test_jetbrains_protocol_e2e(smoke_config: SmokeConfig) -> None:
 
 @pytest.mark.smoke_target("clients")
 def test_pi_cli_prompt_e2e(smoke_config: SmokeConfig, tmp_path: Path) -> None:
+    _run_pi_cli_prompt(smoke_config, tmp_path, launcher="fcc-pi", marker="FCC_SMOKE_PI")
+
+
+@pytest.mark.smoke_target("clients")
+def test_pi_code_cli_prompt_e2e(smoke_config: SmokeConfig, tmp_path: Path) -> None:
+    _run_pi_cli_prompt(
+        smoke_config, tmp_path, launcher="pi-code", marker="FCC_SMOKE_PI_CODE"
+    )
+
+
+def _run_pi_cli_prompt(
+    smoke_config: SmokeConfig,
+    tmp_path: Path,
+    *,
+    launcher: str,
+    marker: str,
+) -> None:
     if not shutil.which("pi"):
         pytest.skip("missing_env: Pi CLI not found")
     uv_bin = shutil.which("uv")
@@ -74,7 +91,7 @@ def test_pi_cli_prompt_e2e(smoke_config: SmokeConfig, tmp_path: Path) -> None:
 
     with SmokeServerDriver(
         smoke_config,
-        name="product-pi-cli",
+        name=f"product-{launcher}",
         env_overrides={
             "MODEL": provider_model.full_model,
             "ANTHROPIC_AUTH_TOKEN": auth_token,
@@ -98,11 +115,11 @@ def test_pi_cli_prompt_e2e(smoke_config: SmokeConfig, tmp_path: Path) -> None:
                 "--project",
                 str(smoke_config.root),
                 "--no-sync",
-                "fcc-pi",
+                launcher,
                 "--no-session",
                 "--no-approve",
                 "--print",
-                "Reply with exactly FCC_SMOKE_PI",
+                f"Reply with exactly {marker}",
             ],
             cwd=tmp_path,
             env=env,
@@ -114,7 +131,7 @@ def test_pi_cli_prompt_e2e(smoke_config: SmokeConfig, tmp_path: Path) -> None:
         server_log = server.log_path.read_text(encoding="utf-8", errors="replace")
 
     assert result.returncode == 0, result.stderr or result.stdout
-    assert "FCC_SMOKE_PI" in result.stdout
+    assert marker in result.stdout
     assert "POST /v1/messages" in server_log
 
 

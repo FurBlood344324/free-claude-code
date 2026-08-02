@@ -30,6 +30,44 @@ def launch(argv: Sequence[str] | None = None) -> None:
     """Launch Pi with a process-local Free Claude Code provider."""
 
     args = list(sys.argv[1:] if argv is None else argv)
+    binary_path = prepare_pi_launch(args)
+    if binary_path is None:
+        return
+
+    settings = get_settings()
+    proxy_root_url = local_proxy_root_url(settings)
+    if error := preflight_proxy(proxy_root_url):
+        print(
+            f"Free Claude Code proxy is not reachable at {proxy_root_url}: {error}",
+            file=sys.stderr,
+        )
+        print("Start it in another terminal with: fcc-server", file=sys.stderr)
+        raise SystemExit(1)
+
+    run_client_process(
+        command=build_pi_launcher_command(
+            binary_path=binary_path,
+            extension_path=require_pi_extension(),
+            argv=args,
+        ),
+        env=build_pi_launcher_env(
+            proxy_root_url=proxy_root_url,
+            auth_token=settings.anthropic_auth_token,
+            base_env=os.environ,
+        ),
+        binary_name=_BINARY_NAME,
+        display_name=_DISPLAY_NAME,
+        install_hint=pi_install_hint(),
+    )
+
+
+def prepare_pi_launch(argv: Sequence[str]) -> str | None:
+    """Resolve and validate the Pi binary, running passthrough commands.
+
+    Returns the resolved binary path when a proxied Pi session should be
+    launched, or ``None`` after a passthrough command has already run.
+    """
+
     install_hint = pi_install_hint()
     binary_path = resolve_client_binary(
         binary_name=_BINARY_NAME,
@@ -44,25 +82,20 @@ def launch(argv: Sequence[str] | None = None) -> None:
         print(install_hint, file=sys.stderr)
         raise SystemExit(126)
 
-    if is_pi_passthrough(args):
+    if is_pi_passthrough(argv):
         run_client_process(
-            command=[binary_path, *args],
+            command=[binary_path, *argv],
             env=os.environ,
             binary_name=_BINARY_NAME,
             display_name=_DISPLAY_NAME,
             install_hint=install_hint,
         )
-        return
+        return None
+    return binary_path
 
-    settings = get_settings()
-    proxy_root_url = local_proxy_root_url(settings)
-    if error := preflight_proxy(proxy_root_url):
-        print(
-            f"Free Claude Code proxy is not reachable at {proxy_root_url}: {error}",
-            file=sys.stderr,
-        )
-        print("Start it in another terminal with: fcc-server", file=sys.stderr)
-        raise SystemExit(1)
+
+def require_pi_extension() -> Path:
+    """Return the bundled Pi extension path, exiting when it is missing."""
 
     extension_path = pi_extension_path()
     if not extension_path.is_file():
@@ -71,22 +104,7 @@ def launch(argv: Sequence[str] | None = None) -> None:
             file=sys.stderr,
         )
         raise SystemExit(1)
-
-    run_client_process(
-        command=build_pi_launcher_command(
-            binary_path=binary_path,
-            extension_path=extension_path,
-            argv=args,
-        ),
-        env=build_pi_launcher_env(
-            proxy_root_url=proxy_root_url,
-            auth_token=settings.anthropic_auth_token,
-            base_env=os.environ,
-        ),
-        binary_name=_BINARY_NAME,
-        display_name=_DISPLAY_NAME,
-        install_hint=install_hint,
-    )
+    return extension_path
 
 
 def build_pi_launcher_command(

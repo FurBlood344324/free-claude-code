@@ -6,11 +6,14 @@ import socket
 import subprocess
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from types import FrameType
 
 from free_claude_code.cli.launchers.common import preflight_proxy
+from free_claude_code.cli.process_registry import kill_all_best_effort
 from free_claude_code.core.interprocess_lock import InterprocessFileLock
 
 _READY_TIMEOUT_SECONDS = 10.0
@@ -226,3 +229,26 @@ def _stop_process(pid: int, process: subprocess.Popen[bytes] | None = None) -> N
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+
+
+@contextmanager
+def cleanup_on_signal(session: ServerSession) -> Iterator[None]:
+    """Release a server session when the wrapper receives a termination signal."""
+
+    previous_handlers: dict[
+        int, Callable[[int, FrameType | None], object] | int | None
+    ] = {}
+
+    def handle_signal(signum: int, _frame: FrameType | None) -> None:
+        kill_all_best_effort()
+        session.release()
+        raise SystemExit(128 + signum)
+
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        previous_handlers[signum] = signal.getsignal(signum)
+        signal.signal(signum, handle_signal)
+    try:
+        yield
+    finally:
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
