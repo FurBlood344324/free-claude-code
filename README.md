@@ -23,8 +23,25 @@ ve son oturum kapandığında kendi başlattığı server'ı durdurur.
 
 ### Linux
 
+Repo klasöründen kurulum:
+
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/install.sh" | sh
+chmod +x scripts/install.sh
+./scripts/install.sh
+```
+
+GitHub üzerinden doğrudan kurulum:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/FurBlood344324/free-claude-code/main/scripts/install.sh" | sh
+```
+
+Sesli not desteği gerekiyorsa:
+
+```bash
+./scripts/install.sh --voice-nim
+./scripts/install.sh --voice-local
+./scripts/install.sh --voice-all
 ```
 
 Kurulumdan sonra yeni terminal aç veya shell ortamını yenile:
@@ -35,21 +52,57 @@ source ~/.bashrc
 
 ### macOS
 
+Repo klasöründen kurulum:
+
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/install.sh" | sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 ```
 
-Kurulumdan sonra yeni terminal aç. macOS'ta **Free Claude Code** uygulaması menü
-çubuğundan da açılabilir.
+GitHub üzerinden doğrudan kurulum:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/FurBlood344324/free-claude-code/main/scripts/install.sh" | sh
+```
+
+İsteğe bağlı ses desteği için Linux ile aynı `--voice-nim`, `--voice-local` veya
+`--voice-all` seçeneklerini kullanabilirsin. Kurulumdan sonra yeni terminal aç;
+macOS'ta **Free Claude Code** uygulaması menü çubuğundan da başlatılabilir.
 
 ### Windows PowerShell
 
+Repo klasöründen kurulum:
+
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/install.ps1")))
+.\scripts\install.ps1
+```
+
+GitHub üzerinden doğrudan kurulum:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/FurBlood344324/free-claude-code/main/scripts/install.ps1")))
+```
+
+Sesli not desteği gerekiyorsa:
+
+```powershell
+.\scripts\install.ps1 -VoiceNim
+.\scripts\install.ps1 -VoiceLocal
+.\scripts\install.ps1 -VoiceAll
 ```
 
 Kurulumdan sonra yeni PowerShell aç. **Free Claude Code** Start menüsünden veya
 masaüstü kısayolundan başlatılabilir.
+
+Kurulumu önce değiştirmeden görmek için:
+
+```bash
+./scripts/install.sh --dry-run
+```
+
+```powershell
+.\scripts\install.ps1 -DryRun
+```
 
 ## Kullanım
 
@@ -183,14 +236,30 @@ http://127.0.0.1:8082/admin
 
 ### Linux/macOS
 
+Repo klasöründe:
+
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/uninstall.sh" | sh
+./scripts/uninstall.sh
+```
+
+Önce ne yapılacağını görmek için:
+
+```bash
+./scripts/uninstall.sh --dry-run
 ```
 
 ### Windows PowerShell
 
+Repo klasöründe:
+
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/uninstall.ps1")))
+.\scripts\uninstall.ps1
+```
+
+Önizleme için:
+
+```powershell
+.\scripts\uninstall.ps1 -DryRun
 ```
 
 Kaldırma işlemi FCC komutlarını ve `~/.fcc/` ayarlarını siler; uv, Python ve
