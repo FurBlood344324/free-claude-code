@@ -67,6 +67,12 @@ class ProviderModelCache:
             return None
         return info.supports_thinking
 
+    def cached_model_info(
+        self, provider_id: str, model_id: str
+    ) -> ProviderModelInfo | None:
+        """Return the cached metadata for one provider model id, if any."""
+        return self._model_infos_by_provider.get(provider_id, {}).get(model_id)
+
     def cached_prefixed_model_infos(self) -> tuple[ProviderModelInfo, ...]:
         """Return cached provider models with user-selectable prefixed ids."""
         infos: list[ProviderModelInfo] = []
@@ -76,6 +82,8 @@ class ProviderModelCache:
                 ProviderModelInfo(
                     model_id=f"{provider_id}/{info.model_id}",
                     supports_thinking=info.supports_thinking,
+                    context_window=info.context_window,
+                    max_output_tokens=info.max_output_tokens,
                 )
                 for info in sorted(
                     provider_infos.values(), key=lambda item: item.model_id

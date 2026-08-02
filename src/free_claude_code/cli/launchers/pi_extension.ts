@@ -8,6 +8,12 @@ const DEFAULT_MAX_TOKENS = 16384;
 const NORMAL_MODEL_PREFIX = "anthropic/";
 const NO_THINKING_MODEL_PREFIX = "claude-3-freecc-no-thinking/";
 
+interface CatalogEntry {
+	id: string;
+	contextWindow?: number;
+	maxTokens?: number;
+}
+
 function requireEnvironment(name: string): string {
 	const value = process.env[name]?.trim();
 	if (!value) {
@@ -35,18 +41,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function catalogModelIds(payload: unknown): string[] {
+function positiveInt(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+		? value
+		: undefined;
+}
+
+function catalogEntryCapability(entry: Record<string, unknown>): {
+	contextWindow?: number;
+	maxTokens?: number;
+} {
+	return {
+		contextWindow: positiveInt(entry.context_window),
+		maxTokens: positiveInt(entry.max_output_tokens),
+	};
+}
+
+function catalogEntries(payload: unknown): CatalogEntry[] {
 	if (!isRecord(payload) || payload.object !== "list" || !Array.isArray(payload.data)) {
 		throw new Error("FCC model catalog returned an invalid response shape.");
 	}
 
-	const ids: string[] = [];
-	for (const entry of payload.data) {
-		if (!isRecord(entry) || typeof entry.id !== "string") continue;
-		const id = entry.id.trim();
-		if (id) ids.push(id);
+	const entries: CatalogEntry[] = [];
+	for (const raw of payload.data) {
+		if (!isRecord(raw) || typeof raw.id !== "string") continue;
+		const id = raw.id.trim();
+		if (!id) continue;
+		const capability = catalogEntryCapability(raw);
+		entries.push({ id, ...capability });
 	}
-	return ids;
+	return entries;
 }
 
 function providerModelRef(id: string, prefix: string): string | undefined {
@@ -56,42 +80,46 @@ function providerModelRef(id: string, prefix: string): string | undefined {
 	return parts.join("/");
 }
 
-function modelDefinition(providerModel: string, reasoning: boolean): ProviderModelConfig {
+function modelDefinition(
+	providerModel: string,
+	reasoning: boolean,
+	capability: { contextWindow?: number; maxTokens?: number } = {},
+): ProviderModelConfig {
 	return {
 		id: providerModel,
 		name: providerModel,
 		reasoning,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: DEFAULT_CONTEXT_WINDOW,
-		maxTokens: DEFAULT_MAX_TOKENS,
+		contextWindow: capability.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+		maxTokens: capability.maxTokens ?? DEFAULT_MAX_TOKENS,
 	};
 }
 
 export function projectFccModels(payload: unknown): ProviderModelConfig[] {
-	const ids = catalogModelIds(payload);
+	const entries = catalogEntries(payload);
 	const normalModels = new Set<string>();
-	for (const id of ids) {
-		const providerModel = providerModelRef(id, NORMAL_MODEL_PREFIX);
+	for (const entry of entries) {
+		const providerModel = providerModelRef(entry.id, NORMAL_MODEL_PREFIX);
 		if (providerModel) normalModels.add(providerModel);
 	}
 
 	const models: ProviderModelConfig[] = [];
 	const seen = new Set<string>();
-	for (const id of ids) {
-		const normalModel = providerModelRef(id, NORMAL_MODEL_PREFIX);
+	for (const entry of entries) {
+		const normalModel = providerModelRef(entry.id, NORMAL_MODEL_PREFIX);
 		if (normalModel) {
 			if (!seen.has(normalModel)) {
 				seen.add(normalModel);
-				models.push(modelDefinition(normalModel, true));
+				models.push(modelDefinition(normalModel, true, entry));
 			}
 			continue;
 		}
 
-		const noThinkingModel = providerModelRef(id, NO_THINKING_MODEL_PREFIX);
+		const noThinkingModel = providerModelRef(entry.id, NO_THINKING_MODEL_PREFIX);
 		if (!noThinkingModel || normalModels.has(noThinkingModel) || seen.has(noThinkingModel)) continue;
 		seen.add(noThinkingModel);
-		models.push(modelDefinition(noThinkingModel, false));
+		models.push(modelDefinition(noThinkingModel, false, entry));
 	}
 
 	if (models.length === 0) {

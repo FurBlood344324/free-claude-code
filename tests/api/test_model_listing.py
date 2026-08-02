@@ -148,3 +148,84 @@ def test_models_list_works_with_empty_discovery_catalog():
         "claude-3-freecc-no-thinking/open_router/anthropic/claude-opus",
     ]
     assert "claude-sonnet-4-20250514" in ids
+
+
+def test_models_list_carries_builtin_capabilities_for_known_models():
+    app = create_test_app(
+        _settings(
+            model="opencode_go/deepseek-v4-flash",
+            model_opus=None,
+            model_haiku=None,
+        )
+    )
+    _cache_models(app, "opencode_go", "deepseek-v4-flash")
+
+    response = TestClient(app).get("/v1/models")
+
+    by_id = {item["id"]: item for item in response.json()["data"]}
+    normal = by_id["anthropic/opencode_go/deepseek-v4-flash"]
+    assert normal["context_window"] == 1000000
+    assert normal["max_output_tokens"] == 384000
+    no_thinking = by_id["claude-3-freecc-no-thinking/opencode_go/deepseek-v4-flash"]
+    assert no_thinking["context_window"] == 1000000
+    assert no_thinking["max_output_tokens"] == 384000
+
+
+def test_models_list_prefers_provider_capabilities_over_builtin():
+    app = create_test_app(
+        _settings(
+            model="open_router/deepseek-v4-flash",
+            model_opus=None,
+            model_haiku=None,
+        )
+    )
+    provider_manager_for_app(app).cache_model_infos(
+        "open_router",
+        {
+            ProviderModelInfo(
+                "deepseek-v4-flash",
+                context_window=262144,
+                max_output_tokens=65536,
+            )
+        },
+    )
+
+    response = TestClient(app).get("/v1/models")
+
+    by_id = {item["id"]: item for item in response.json()["data"]}
+    normal = by_id["anthropic/open_router/deepseek-v4-flash"]
+    assert normal["context_window"] == 262144
+    assert normal["max_output_tokens"] == 65536
+
+
+def test_models_list_omits_capabilities_for_unknown_models():
+    app = create_test_app(
+        _settings(
+            model="open_router/mystery-model",
+            model_opus=None,
+            model_haiku=None,
+        )
+    )
+    _cache_models(app, "open_router", "mystery-model")
+
+    response = TestClient(app).get("/v1/models")
+
+    item = next(
+        item
+        for item in response.json()["data"]
+        if item["id"] == "anthropic/open_router/mystery-model"
+    )
+    assert "context_window" not in item
+    assert "max_output_tokens" not in item
+
+
+def test_models_list_aliases_carry_builtin_capabilities():
+    app = create_test_app(_settings())
+
+    response = TestClient(app).get("/v1/models")
+
+    by_id = {item["id"]: item for item in response.json()["data"]}
+    assert by_id["claude-fable-5"]["context_window"] == 1000000
+    assert by_id["claude-fable-5"]["max_output_tokens"] == 128000
+    assert by_id["claude-sonnet-4-20250514"]["context_window"] == 200000
+    assert by_id["claude-sonnet-4-20250514"]["max_output_tokens"] == 64000

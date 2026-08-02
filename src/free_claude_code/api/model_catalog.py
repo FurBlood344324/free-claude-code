@@ -4,6 +4,11 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from free_claude_code.application.model_capabilities import resolve_model_capability
+from free_claude_code.application.model_metadata import (
+    ModelCapability,
+    ProviderModelInfo,
+)
 from free_claude_code.application.ports import RequestRuntimePort
 from free_claude_code.config.model_refs import configured_chat_model_refs
 from free_claude_code.config.settings import Settings
@@ -23,6 +28,8 @@ class ModelResponse(BaseModel):
     display_name: str
     id: str
     type: Literal["model"] = "model"
+    context_window: int | None = None
+    max_output_tokens: int | None = None
 
 
 class ModelsListResponse(BaseModel):
@@ -85,14 +92,16 @@ def build_models_list_response(
     seen: set[str] = set()
 
     for ref in configured_chat_model_refs(settings):
-        supports_thinking = runtime.cached_model_supports_thinking(
-            ref.provider_id, ref.model_id
-        )
+        cached = runtime.cached_model_info(ref.provider_id, ref.model_id)
+        capability = _configured_model_capability(cached, ref.model_id)
         _append_provider_model_variants(
             models,
             seen,
             ref.model_ref,
-            supports_thinking=supports_thinking,
+            supports_thinking=(
+                cached.supports_thinking if cached is not None else None
+            ),
+            capability=capability,
         )
 
     for model_info in runtime.cached_prefixed_model_infos():
@@ -101,10 +110,11 @@ def build_models_list_response(
             seen,
             model_info.model_id,
             supports_thinking=model_info.supports_thinking,
+            capability=model_info.capability,
         )
 
     for model in SUPPORTED_CLAUDE_MODELS:
-        _append_unique_model(models, seen, model)
+        _append_unique_model(models, seen, _alias_model_response(model))
 
     return ModelsListResponse(
         data=models,
@@ -114,11 +124,41 @@ def build_models_list_response(
     )
 
 
-def _discovered_model_response(model_id: str, *, display_name: str) -> ModelResponse:
+def _configured_model_capability(
+    cached: ProviderModelInfo | None, model_id: str
+) -> ModelCapability:
+    """Resolve capability for a configured ref from cache or built-in data."""
+    provider_supplied = cached.capability if cached is not None else None
+    return resolve_model_capability(model_id, provider_supplied=provider_supplied)
+
+
+def _alias_model_response(model: ModelResponse) -> ModelResponse:
+    """Resolve built-in token limits for a fixed Claude compatibility alias."""
+    capability = resolve_model_capability(model.id)
+    if capability.context_window is None and capability.max_output_tokens is None:
+        return model
+    return ModelResponse(
+        id=model.id,
+        display_name=model.display_name,
+        created_at=model.created_at,
+        context_window=capability.context_window,
+        max_output_tokens=capability.max_output_tokens,
+    )
+
+
+def _discovered_model_response(
+    model_id: str,
+    *,
+    display_name: str,
+    capability: ModelCapability | None = None,
+) -> ModelResponse:
+    resolved = resolve_model_capability(model_id, provider_supplied=capability)
     return ModelResponse(
         id=model_id,
         display_name=display_name,
         created_at=DISCOVERED_MODEL_CREATED_AT,
+        context_window=resolved.context_window,
+        max_output_tokens=resolved.max_output_tokens,
     )
 
 
@@ -137,6 +177,7 @@ def _append_provider_model_variants(
     provider_model_ref: str,
     *,
     supports_thinking: bool | None = None,
+    capability: ModelCapability | None = None,
 ) -> None:
     if supports_thinking is not False:
         _append_unique_model(
@@ -145,6 +186,7 @@ def _append_provider_model_variants(
             _discovered_model_response(
                 gateway_model_id(provider_model_ref),
                 display_name=provider_model_ref,
+                capability=capability,
             ),
         )
     _append_unique_model(
@@ -153,5 +195,6 @@ def _append_provider_model_variants(
         _discovered_model_response(
             no_thinking_gateway_model_id(provider_model_ref),
             display_name=f"{provider_model_ref} (no thinking)",
+            capability=capability,
         ),
     )

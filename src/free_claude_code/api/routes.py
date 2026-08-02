@@ -186,7 +186,9 @@ async def probe_health():
     return _probe_response("GET, HEAD, OPTIONS")
 
 
-@router.get("/v1/models", response_model=ModelsListResponse)
+@router.get(
+    "/v1/models", response_model=ModelsListResponse, response_model_exclude_none=True
+)
 async def list_models(
     services: ApiServices = Depends(get_services),
     settings: Settings = Depends(get_settings),
