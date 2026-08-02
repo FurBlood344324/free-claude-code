@@ -1,4 +1,4 @@
-"""pystray adapter for the Windows tray, macOS menu bar, and Linux status area."""
+"""Tray adapters for the Windows tray, macOS menu bar, and Linux status area."""
 
 import sys
 from io import BytesIO
@@ -89,6 +89,17 @@ def _systray_available() -> bool:
     return _x11_systray_available()
 
 
+def _sni_host_available() -> bool:
+    """Return True when a StatusNotifierItem host can display the tray."""
+
+    if sys.platform != "linux":
+        return False
+    # dbus-fast is only installed on Linux, so keep the SNI import lazy.
+    from free_claude_code.cli.sni_tray import sni_host_available
+
+    return sni_host_available()
+
+
 def _create_icon() -> Image.Image:
     """Load the same branded artwork used by native desktop launchers."""
 
@@ -99,6 +110,12 @@ def _create_icon() -> Image.Image:
 def launch() -> None:
     """Launch the native tray adapter or degrade to headless mode."""
 
+    if _sni_host_available():
+        # dbus-fast is only installed on Linux, so keep the SNI import lazy.
+        from free_claude_code.cli.sni_tray import StatusNotifierDesktopTray
+
+        launch_desktop(StatusNotifierDesktopTray)
+        return
     if not _systray_available():
         print(
             "FCC Desktop could not find a system tray on this desktop; it is "

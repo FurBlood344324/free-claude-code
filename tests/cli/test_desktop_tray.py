@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from free_claude_code.cli import desktop_tray
+from free_claude_code.cli import desktop_tray, sni_tray
 
 
 class _FakeXlibPackage(types.ModuleType):
@@ -140,6 +140,7 @@ def test_launch_uses_pystray_when_systray_is_available(
     def fake_launch_desktop(tray_factory: object) -> None:
         launched.append(tray_factory)
 
+    monkeypatch.setattr(desktop_tray, "_sni_host_available", lambda: False)
     monkeypatch.setattr(desktop_tray, "_systray_available", lambda: True)
     monkeypatch.setattr(desktop_tray, "launch_desktop", fake_launch_desktop)
 
@@ -157,6 +158,7 @@ def test_launch_falls_back_to_headless_without_systray(
     def fake_launch_desktop(tray_factory: object) -> None:
         launched.append(tray_factory)
 
+    monkeypatch.setattr(desktop_tray, "_sni_host_available", lambda: False)
     monkeypatch.setattr(desktop_tray, "_systray_available", lambda: False)
     monkeypatch.setattr(desktop_tray, "launch_desktop", fake_launch_desktop)
 
@@ -164,3 +166,46 @@ def test_launch_falls_back_to_headless_without_systray(
 
     assert launched == [desktop_tray.HeadlessDesktopTray]
     assert "system tray" in capsys.readouterr().err
+
+
+def test_sni_host_available_is_false_outside_linux(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(desktop_tray.sys, "platform", "win32")
+
+    assert desktop_tray._sni_host_available() is False
+
+
+def test_sni_host_available_probes_sni_host_on_linux(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    probe = MagicMock(return_value=True)
+    monkeypatch.setattr(sni_tray, "sni_host_available", probe)
+
+    assert desktop_tray._sni_host_available() is True
+    probe.assert_called_once_with()
+
+
+def test_sni_host_available_false_when_probe_says_no(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    probe = MagicMock(return_value=False)
+    monkeypatch.setattr(sni_tray, "sni_host_available", probe)
+
+    assert desktop_tray._sni_host_available() is False
+
+
+def test_launch_prefers_sni_tray_when_host_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    launched: list[object] = []
+
+    def fake_launch_desktop(tray_factory: object) -> None:
+        launched.append(tray_factory)
+
+    monkeypatch.setattr(desktop_tray, "_sni_host_available", lambda: True)
+    monkeypatch.setattr(desktop_tray, "launch_desktop", fake_launch_desktop)
+
+    desktop_tray.launch()
+
+    assert launched == [sni_tray.StatusNotifierDesktopTray]
