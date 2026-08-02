@@ -31,6 +31,7 @@ $FccCommands = @(
     "fcc-codex",
     "fcc-pi",
     "pi-code",
+    "cmd-code",
     "fcc-init",
     "free-claude-code"
 )
@@ -559,7 +560,7 @@ function Configure-AndConfirmFreeClaudeCode {
     if ($DryRun) {
         Write-Host "+ uv tool update-shell"
         Write-Host "+ uv tool dir --bin"
-        Write-Host "+ verify fcc-desktop, fcc-server, fcc-claude, claude-code, fcc-codex, fcc-pi, and pi-code in the uv tool bin directory"
+        Write-Host "+ verify fcc-desktop, fcc-server, fcc-claude, claude-code, fcc-codex, fcc-pi, pi-code, and cmd-code in the uv tool bin directory"
         Write-Host "+ fcc-server --version"
         Export-FccDesktopIcon `
             -DesktopCommand "<uv-tool-bin>\fcc-desktop.exe" `
@@ -586,7 +587,7 @@ function Configure-AndConfirmFreeClaudeCode {
         [IO.Path]::AltDirectorySeparatorChar
     )
     $installedCommands = @{}
-    foreach ($commandName in @("fcc-desktop", "fcc-server", "fcc-claude", "claude-code", "fcc-codex", "fcc-pi", "pi-code")) {
+    foreach ($commandName in @("fcc-desktop", "fcc-server", "fcc-claude", "claude-code", "fcc-codex", "fcc-pi", "pi-code", "cmd-code")) {
         $command = Get-ApplicationCommand $commandName
         if (-not $command) {
             throw "Free Claude Code installation did not create '$commandName'."
@@ -720,6 +721,7 @@ else {
     Write-Host "For terminal use, start the proxy with: fcc-server"
     Write-Host "Run Claude Code with: fcc-claude"
     Write-Host "Run Codex with: fcc-codex"
+    Write-Host "Run Command Code with: cmd-code"
     if ($script:PiAvailable) {
         Write-Host "Run Pi with: pi-code"
         Write-Host "For manual server management, use: fcc-pi"

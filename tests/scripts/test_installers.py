@@ -15,6 +15,7 @@ FCC_COMMANDS = (
     "fcc-codex",
     "fcc-pi",
     "pi-code",
+    "cmd-code",
     "fcc-init",
     "free-claude-code",
 )
@@ -67,17 +68,25 @@ fi
 
 def _posix_npm_command() -> str:
     return """#!/bin/sh
-echo "npm:$*" >> "$CALL_LOG"
-if [ "${1:-}" = "prefix" ] && [ "${2:-}" = "-g" ]; then
-    printf '%s\n' "$FAKE_NPM_PREFIX"
-    exit 0
-fi
-if [ "${1:-}" = "config" ] && [ "${2:-}" = "get" ] && [ "${3:-}" = "prefix" ]; then
-    printf '%s\n' "$FAKE_NPM_PREFIX"
-    exit 0
-fi
-exit 71
-"""
+ echo "npm:$*" >> "$CALL_LOG"
+ if [ "${1:-}" = "prefix" ] && [ "${2:-}" = "-g" ]; then
+     printf '%s\n' "${FAKE_NPM_PREFIX:-$HOME/.local}"
+     exit 0
+ fi
+ if [ "${1:-}" = "config" ] && [ "${2:-}" = "get" ] && [ "${3:-}" = "prefix" ]; then
+     printf '%s\n' "${FAKE_NPM_PREFIX:-$HOME/.local}"
+     exit 0
+ fi
+ if [ "${1:-}" = "install" ] && [ "${2:-}" = "--global" ] && [ "${3:-}" = "command-code" ]; then
+     [ "$FAIL_STEP" = "cmd-install" ] && exit 72
+     npm_bin="${FAKE_NPM_PREFIX:-$HOME/.local}/bin"
+     mkdir -p "$npm_bin"
+     cp "$FAKE_FIXTURES/cmd-command.sh" "$npm_bin/cmd"
+     chmod +x "$npm_bin/cmd"
+     exit 0
+ fi
+ exit 71
+ """
 
 
 def _posix_uv_command(version: str) -> str:
@@ -104,10 +113,11 @@ if [ "${{1:-}}" = "tool" ] && [ "${{2:-}}" = "install" ]; then
     cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/claude-code"
     cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/fcc-pi"
     cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/pi-code"
+    cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/cmd-code"
     if [ "$FAIL_STEP" != "fcc-missing" ]; then
         cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/fcc-codex"
     fi
-    chmod +x "$FAKE_TOOL_BIN"/fcc-* "$FAKE_TOOL_BIN/claude-code" "$FAKE_TOOL_BIN/pi-code"
+    chmod +x "$FAKE_TOOL_BIN"/fcc-* "$FAKE_TOOL_BIN/claude-code" "$FAKE_TOOL_BIN/pi-code" "$FAKE_TOOL_BIN/cmd-code"
     exit 0
 fi
 if [ "${{1:-}}" = "tool" ] && [ "${{2:-}}" = "update-shell" ]; then
@@ -185,12 +195,34 @@ def posix_harness(tmp_path: Path) -> PosixHarness:
         pytest.skip("POSIX installer scenarios run on POSIX hosts")
 
     bin_dir = tmp_path / "bin"
+    system_bin = tmp_path / "system-bin"
     fixtures = tmp_path / "fixtures"
     tool_bin = tmp_path / "tool-bin"
     home = tmp_path / "home"
     log = tmp_path / "calls.log"
-    for path in (bin_dir, fixtures, tool_bin, home):
+    for path in (bin_dir, system_bin, fixtures, tool_bin, home):
         path.mkdir(parents=True)
+    for command_name in (
+        "awk",
+        "bash",
+        "cat",
+        "chmod",
+        "cp",
+        "dirname",
+        "ln",
+        "mkdir",
+        "mktemp",
+        "readlink",
+        "rm",
+        "sed",
+        "sh",
+        "sort",
+    ):
+        source = shutil.which(command_name, path="/bin:/usr/bin")
+        if source is None:
+            raise AssertionError(f"Missing system test utility: {command_name}")
+        (system_bin / command_name).symlink_to(source)
+    _write_executable(bin_dir / "npm", _posix_npm_command())
 
     _write_executable(
         bin_dir / "pgrep",
@@ -287,6 +319,8 @@ chmod +x "$HOME/.local/bin/uv"
     _write_executable(fixtures / "claude-command.sh", _posix_command("claude"))
     _write_executable(fixtures / "codex-command.sh", _posix_command("codex"))
     _write_executable(fixtures / "pi-command.sh", _posix_command("pi"))
+    _write_executable(fixtures / "cmd-command.sh", _posix_command("cmd"))
+    _write_executable(bin_dir / "node", "#!/bin/sh\nprintf 'v22.14.0\\n'\n")
     _write_executable(fixtures / "uv-command.sh", _posix_uv_command("0.11.28"))
     _write_executable(
         fixtures / "fcc-command.sh",
@@ -316,7 +350,7 @@ printf '%s\n' "${FAKE_UNAME:-Linux}"
     env = os.environ.copy()
     env.update(
         {
-            "PATH": f"{bin_dir}:/usr/bin:/bin",
+            "PATH": f"{bin_dir}:{system_bin}",
             "HOME": str(home),
             "CALL_LOG": str(log),
             "FAKE_FIXTURES": str(fixtures),
@@ -340,13 +374,16 @@ def test_install_sh_fresh_install_is_verified(posix_harness: PosixHarness) -> No
     calls = posix_harness.calls()
     assert calls.index("claude-install") < calls.index("claude:--version")
     assert calls.index("codex-install:1") < calls.index("codex:--version")
+    assert calls.index("npm:install --global command-code") < calls.index(
+        "cmd:--version"
+    )
     assert calls.index("pi-install") < calls.index("pi:--version")
     assert calls.index("uv-install") < calls.index("uv:--version")
     assert any(
         call.startswith(
             "uv:tool install --force --refresh-package free-claude-code "
             "--python 3.14.0 free-claude-code @ "
-            "https://github.com/Alishahryar1/free-claude-code/archive/refs/heads/main.zip"
+            "https://github.com/FurBlood344324/free-claude-code/archive/refs/heads/main.zip"
         )
         for call in calls
     )
@@ -584,6 +621,8 @@ def test_install_sh_replaces_prerelease_uv(
         "codex-download",
         "codex-install",
         "codex-verify",
+        "cmd-install",
+        "cmd-verify",
         "pi-download",
         "pi-install",
         "pi-verify",
@@ -611,6 +650,8 @@ def test_install_sh_stops_without_success_on_each_failure(
         "codex-download": "codex-install",
         "codex-install": "codex:--version",
         "codex-verify": "pi.dev",
+        "cmd-install": "cmd:--version",
+        "cmd-verify": "pi.dev",
         "pi-download": "pi-install",
         "pi-install": "pi:--version",
         "pi-verify": "astral.sh",
@@ -669,7 +710,7 @@ def test_install_sh_voice_flags_only_change_fcc_spec(
     assert result.returncode == 0, result.stderr
     assert any(
         "--torch-backend cu130 free-claude-code[voice,voice_local] @ "
-        "https://github.com/Alishahryar1/free-claude-code/archive/refs/heads/main.zip"
+        "https://github.com/FurBlood344324/free-claude-code/archive/refs/heads/main.zip"
         in call
         for call in posix_harness.calls()
     )
@@ -920,6 +961,7 @@ copy /y "%FAKE_FIXTURES%\fcc-command.cmd" "%FAKE_TOOL_BIN%\fcc-desktop.cmd" >nul
 copy /y "%FAKE_FIXTURES%\fcc-command.cmd" "%FAKE_TOOL_BIN%\fcc-claude.cmd" >nul
 copy /y "%FAKE_FIXTURES%\fcc-command.cmd" "%FAKE_TOOL_BIN%\fcc-pi.cmd" >nul
 copy /y "%FAKE_FIXTURES%\fcc-command.cmd" "%FAKE_TOOL_BIN%\pi-code.cmd" >nul
+copy /y "%FAKE_FIXTURES%\fcc-command.cmd" "%FAKE_TOOL_BIN%\cmd-code.cmd" >nul
 if not "%FAIL_STEP%"=="fcc-missing" copy /y "%FAKE_FIXTURES%\fcc-command.cmd" "%FAKE_TOOL_BIN%\fcc-codex.cmd" >nul
 exit /b 0
 :update_shell
@@ -1168,7 +1210,7 @@ def test_install_ps1_fresh_install_is_verified(
             "uv:tool install --force --refresh-package free-claude-code "
             "--python cpython-3.14.0-windows-x86_64-none "
             '"free-claude-code @ '
-            'https://github.com/Alishahryar1/free-claude-code/archive/refs/heads/main.zip"'
+            'https://github.com/FurBlood344324/free-claude-code/archive/refs/heads/main.zip"'
         )
         for call in calls
     )
@@ -1477,7 +1519,7 @@ def test_install_ps1_voice_flags_only_change_fcc_spec(
     assert result.returncode == 0, result.stderr
     assert any(
         '--torch-backend cu130 "free-claude-code[voice,voice_local] @ '
-        'https://github.com/Alishahryar1/free-claude-code/archive/refs/heads/main.zip"'
+        'https://github.com/FurBlood344324/free-claude-code/archive/refs/heads/main.zip"'
         in call
         for call in powershell_harness.calls()
     )
@@ -1539,7 +1581,7 @@ def test_installers_use_native_clients_and_single_python_selection() -> None:
         assert "git+" not in text
         assert "git --version" not in text
         assert (
-            "https://github.com/Alishahryar1/free-claude-code/archive/refs/heads/main.zip"
+            "https://github.com/FurBlood344324/free-claude-code/archive/refs/heads/main.zip"
             in text
         )
         assert "python install" not in text
@@ -1559,9 +1601,7 @@ def test_install_ps1_uses_x64_python_for_windows_arm_compatibility() -> None:
 
 def test_readme_install_section_has_no_manual_git_prerequisite() -> None:
     readme = (_repo_root() / "README.md").read_text(encoding="utf-8")
-    install_section = readme.split("### 1. Install Or Update", 1)[1].split(
-        "### 2. Start FCC", 1
-    )[0]
+    install_section = readme.split("## Kurulum", 1)[1].split("## Kullan\u0131m", 1)[0]
 
     assert "Install Git" not in install_section
     assert "official native installers" not in install_section

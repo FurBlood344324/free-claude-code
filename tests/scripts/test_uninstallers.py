@@ -14,6 +14,7 @@ FCC_COMMANDS = (
     "fcc-codex",
     "fcc-pi",
     "pi-code",
+    "cmd-code",
     "fcc-init",
     "free-claude-code",
 )
@@ -155,7 +156,7 @@ if [ "${1:-}" = "tool" ] && [ "${2:-}" = "uninstall" ]; then
         echo 'Tool `free-claude-code` is not installed' >&2
         exit 2
     fi
-    for name in fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code fcc-init free-claude-code; do
+    for name in fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code cmd-code fcc-init free-claude-code; do
         /bin/rm -f "$FAKE_TOOL_BIN/$name"
     done
     echo "Uninstalled free-claude-code"
@@ -685,10 +686,11 @@ def test_readme_uninstall_uses_raw_urls_and_verification_contract() -> None:
 
     assert (
         'curl -fsSL "https://raw.githubusercontent.com/'
-        'Alishahryar1/free-claude-code/main/scripts/uninstall.sh" | sh'
+        'FurBlood344324/free-claude-code/main/scripts/uninstall.sh" | sh'
     ) in text
     assert (
         '& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/'
-        'Alishahryar1/free-claude-code/main/scripts/uninstall.ps1")))'
+        'FurBlood344324/free-claude-code/main/scripts/uninstall.ps1")))'
     ) in text
-    assert "verifies every FCC command is gone" in text
+    assert "tüm FCC entry point'lerini" in text
+    assert "cmd-code" in text

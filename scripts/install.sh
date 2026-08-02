@@ -8,10 +8,11 @@ CLAUDE_INSTALL_URL="https://claude.ai/install.sh"
 CODEX_INSTALL_URL="https://chatgpt.com/codex/install.sh"
 PI_INSTALL_URL="https://pi.dev/install.sh"
 UV_INSTALL_URL="https://astral.sh/uv/install.sh"
+COMMAND_CODE_PACKAGE="command-code"
 FCC_MACOS_BUNDLE_ID="io.github.alishahryar1.free-claude-code"
 FCC_MACOS_OWNER_FILE=".free-claude-code-owner"
 # Include retired entry points so updates reject older FCC processes before replacement.
-FCC_COMMANDS="fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code fcc-init free-claude-code"
+FCC_COMMANDS="fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code cmd-code fcc-init free-claude-code"
 
 dry_run=0
 voice_nim=0
@@ -26,7 +27,7 @@ show_usage() {
     cat <<'USAGE'
 Usage: install.sh [options]
 
-Installs Claude Code and Codex, offers to install Pi, ensures a compatible uv, and installs or updates Free Claude Code.
+Installs Claude Code, Command Code CLI, and Codex, offers to install Pi, ensures a compatible uv, and installs or updates Free Claude Code.
 
 Options:
   --voice-nim              Install NVIDIA NIM voice transcription support.
@@ -116,17 +117,21 @@ add_known_bin_directories() {
     hash -r 2>/dev/null || true
 }
 
-add_pi_bin_directories() {
+add_npm_bin_directories() {
     [ "$dry_run" -eq 0 ] || return 0
     add_known_bin_directories
     if command -v npm >/dev/null 2>&1; then
-        pi_npm_prefix=$(npm prefix -g 2>/dev/null || npm config get prefix 2>/dev/null || true)
-        if [ -n "$pi_npm_prefix" ]; then
-            add_path_entry "$pi_npm_prefix/bin"
+        npm_prefix=$(npm prefix -g 2>/dev/null || npm config get prefix 2>/dev/null || true)
+        if [ -n "$npm_prefix" ]; then
+            add_path_entry "$npm_prefix/bin"
             export PATH
             hash -r 2>/dev/null || true
         fi
     fi
+}
+
+add_pi_bin_directories() {
+    add_npm_bin_directories
 }
 
 fcc_process_ids() {
@@ -297,6 +302,36 @@ ensure_codex() {
     fi
 
     verify_command codex "Codex"
+}
+
+verify_node_for_command_code() {
+    if [ "$dry_run" -eq 1 ]; then
+        print_command node --version
+        return 0
+    fi
+
+    node_version=$(node --version 2>/dev/null) || fail "Unable to determine the Node.js version required by Command Code CLI."
+    node_major=${node_version#v}
+    node_major=${node_major%%.*}
+    case "$node_major" in
+        ''|*[!0-9]*) fail "Command Code CLI requires Node.js 22 or newer; found $node_version." ;;
+    esac
+    [ "$node_major" -ge 22 ] || fail "Command Code CLI requires Node.js 22 or newer; found $node_version."
+}
+
+ensure_command_code() {
+    add_npm_bin_directories
+    if command -v cmd >/dev/null 2>&1; then
+        printf 'Command Code CLI already found on PATH; verifying it.\n'
+    else
+        require_command node
+        require_command npm
+        verify_node_for_command_code
+        run npm install --global "$COMMAND_CODE_PACKAGE"
+        add_npm_bin_directories
+    fi
+
+    verify_command cmd "Command Code CLI"
 }
 
 ensure_pi() {
@@ -510,7 +545,7 @@ configure_and_verify_free_claude_code() {
 
     if [ "$dry_run" -eq 1 ]; then
         print_command uv tool dir --bin
-        printf '+ verify fcc-desktop, fcc-server, fcc-claude, claude-code, fcc-codex, fcc-pi, and pi-code in the uv tool bin directory\n'
+        printf '+ verify fcc-desktop, fcc-server, fcc-claude, claude-code, fcc-codex, fcc-pi, pi-code, and cmd-code in the uv tool bin directory\n'
         print_command fcc-server --version
         return 0
     fi
@@ -528,7 +563,7 @@ configure_and_verify_free_claude_code() {
     export PATH
     hash -r 2>/dev/null || true
 
-    for command_name in fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code; do
+    for command_name in fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code cmd-code; do
         [ -x "$tool_bin/$command_name" ] || fail "Free Claude Code installation did not create $tool_bin/$command_name."
     done
 
@@ -643,6 +678,9 @@ ensure_claude
 step "Ensuring Codex is installed"
 ensure_codex
 
+step "Ensuring Command Code CLI is installed"
+ensure_command_code
+
 step "Checking or installing Pi"
 ensure_pi
 
@@ -672,6 +710,7 @@ else
     printf 'Run Claude Code with: claude-code\n'
     printf 'For manual server management, use: fcc-claude\n'
     printf 'Run Codex with: fcc-codex\n'
+    printf 'Run Command Code with: cmd-code (upstream: cmd)\n'
     if [ "$pi_available" -eq 1 ]; then
         printf 'Run Pi with: pi-code\n'
         printf 'For manual server management, use: fcc-pi\n'

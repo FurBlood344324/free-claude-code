@@ -19,14 +19,15 @@ There are three runtime surfaces:
 
 - HTTP proxy: FastAPI routes expose Anthropic-compatible, Responses-compatible,
   health, model-listing, stop, and admin endpoints.
-- CLI launchers: wrapper entrypoints prepare Claude Code, Codex, and Pi sessions
-  so they target the local proxy.
+- CLI launchers: wrapper entrypoints prepare Claude Code, Command Code, Codex, and Pi
+  sessions so they target the local proxy.
 - Messaging bridge: optional Discord or Telegram adapters turn chat messages
   into managed client CLI sessions.
 
 ```mermaid
 flowchart LR
     ClaudeCode[Claude Code CLI and Extensions] --> ProxyAPI[FastAPI Proxy]
+    CommandCode[Command Code CLI] --> ProxyAPI
     Codex[Codex CLI, IDE, and App] --> ProxyAPI
     Pi[Pi Coding Agent] --> ProxyAPI
     AdminUI[Local Admin UI] --> ProxyAPI
@@ -154,6 +155,8 @@ for real prompts against supported providers:
   Code relies on, including streaming text, native/interleaved thinking, tool
   use/results, model discovery, token counting, retries/recovery, and supported
   local server-tool behavior.
+- `cmd-code`, Command Code CLI, and the Anthropic-compatible proxy environment
+  and managed server lifecycle needed for Command Code sessions.
 - `fcc-codex`, Codex CLI/extensions, and the streaming OpenAI Responses behavior
   Codex relies on, including native/interleaved reasoning, function and custom
   tool calls, generated `/model` catalog support, Responses stream lifecycle
@@ -215,6 +218,12 @@ Console scripts are registered in [pyproject.toml](pyproject.toml):
 - `fcc-claude` calls `free_claude_code.cli.launchers.claude:launch`.
 - `fcc-codex` calls `free_claude_code.cli.launchers.codex:launch`.
 - `fcc-pi` calls `free_claude_code.cli.launchers.pi:launch`.
+- `cmd-code` calls `free_claude_code.cli.launchers.cmd_code:launch` and manages a shared FCC server session for the Command Code CLI.
+
+Managed client launchers acquire a reference-counted FCC server session, pass only
+client-compatible proxy environment variables to the child process, and release
+the session on normal exit or signal cleanup. `cmd-code` passes Command Code
+arguments transparently and runs server-independent management commands directly.
 
 [scripts/install.sh](scripts/install.sh) and [scripts/install.ps1](scripts/install.ps1)
 install or update the uv tool plus optional voice extras. On Windows the

@@ -3,14 +3,16 @@
 Claude Code'u kendi seçtiğin cloud veya local model sağlayıcısıyla çalıştırmak için
 kullanılan kişisel bir local proxy.
 
-Ana kullanım komutu:
+Ana kullanım komutları:
 
 ```text
 claude-code
+cmd-code
 ```
 
-Bu komut FCC server'ı gerektiğinde başlatır, Claude Code'u proxy üzerinden çalıştırır
-ve son oturum kapandığında kendi başlattığı server'ı durdurur.
+`claude-code` Claude Code'u, `cmd-code` ise Command Code CLI'ını FCC proxy'si
+üzerinden çalıştırır. Her iki komut da FCC server'ını gerektiğinde başlatır ve son
+oturum kapandığında kendi başlattığı server'ı durdurur.
 
 Pi Coding Agent'ı da aynı şekilde çalıştırılabilir:
 
@@ -26,7 +28,7 @@ server'ı durdurur.
 
 - Python 3.14
 - [uv](https://docs.astral.sh/uv/)
-- Claude Code ve/veya [Pi Coding Agent](https://pi.dev)
+- Claude Code, Command Code CLI ve/veya [Pi Coding Agent](https://pi.dev)
 - Bir model sağlayıcısı ve gerekiyorsa API anahtarı
 
 ## Kurulum
@@ -53,6 +55,9 @@ Sesli not desteği gerekiyorsa:
 ./scripts/install.sh --voice-local
 ./scripts/install.sh --voice-all
 ```
+
+Kurulum scripti, sistemde `cmd` yoksa Node.js 22+ ve npm üzerinden resmi
+`command-code` paketini (`npm install --global command-code`) kurar.
 
 Kurulumdan sonra yeni terminal aç veya shell ortamını yenile:
 
@@ -120,14 +125,20 @@ Kurulumdan sonra doğrudan çalıştır:
 
 ```bash
 claude-code
+cmd-code
 ```
 
-Claude Code argümanları normal şekilde aktarılır:
+Her iki wrapper da upstream CLI argümanlarını normal şekilde aktarır:
 
 ```bash
 claude-code --resume <session-id>
-claude-code --help
+cmd-code --resume <session-id>
+cmd-code -p "kısa bir görev"
+cmd-code --help
 ```
+
+`cmd-code`, PATH üzerindeki resmi `cmd` executable'ını çalıştırır. `cmd` bulunamıyorsa
+önce Command Code CLI'ı kurmalısın.
 
 `claude-code`, upstream Claude Code komutunu (`claude`) FCC proxy'sine bağlayan
 wrapper'dır. Manuel server yönetmek istersen:
@@ -280,8 +291,23 @@ Repo klasöründe:
 .\scripts\uninstall.ps1 -DryRun
 ```
 
-Kaldırma işlemi FCC komutlarını ve `~/.fcc/` ayarlarını siler; uv, Python ve
-Claude Code'u silmez.
+Kaldırma işlemi tüm FCC entry point'lerini (`cmd-code` dahil) doğrulayarak siler ve
+`~/.fcc/` ayarlarını kaldırır; uv, Python, Claude Code ve Command Code CLI'ı silmez.
+
+Linux/macOS uzak kaldırma:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/FurBlood344324/free-claude-code/main/scripts/uninstall.sh" | sh
+```
+
+Windows PowerShell uzak kaldırma:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/FurBlood344324/free-claude-code/main/scripts/uninstall.ps1")))
+```
+
+Kaldırıcı, tüm FCC komutlarının (`cmd-code` dahil) silindiğini doğrulamadan `~/.fcc/`
+dizinini silmez.
 
 ## Lisans
 
