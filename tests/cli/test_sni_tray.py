@@ -4,7 +4,6 @@ import asyncio
 import os
 import threading
 import time
-from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -123,104 +122,11 @@ def test_about_to_show_is_true() -> None:
 def test_tray_entries_mirror_pystray_menu() -> None:
     controller = MagicMock()
     tray = StatusNotifierDesktopTray(controller)
-    assert [entry.item_id for entry in tray._entries] == [1, 2, 3, 4, 5]
-    assert [entry.label for entry in tray._entries] == [
-        "Open Admin",
-        "Check Server Status",
-        "Restart Server",
-        "",
-        "Quit",
-    ]
-    assert [entry.separator for entry in tray._entries] == [
-        False,
-        False,
-        False,
-        True,
-        False,
-    ]
+    assert [entry.item_id for entry in tray._entries] == [1, 2]
+    assert [entry.label for entry in tray._entries] == ["Open", "Quit"]
+    assert [entry.separator for entry in tray._entries] == [False, False]
     assert tray._entries[0].action == controller.open_admin
-    assert tray._entries[2].action == controller.restart_server
-    assert tray._entries[4].action == controller.quit
-    assert tray._entries[3].action is None
-
-
-def test_check_status_without_loop_is_noop() -> None:
-    tray = StatusNotifierDesktopTray(MagicMock())
-    assert tray._loop is None
-    tray._check_status()  # must not raise
-
-
-class _FakeLoop:
-    def __init__(self) -> None:
-        self.callbacks: list[Callable[[], None]] = []
-
-    def call_soon_threadsafe(self, callback: Callable[[], None]) -> None:
-        self.callbacks.append(callback)
-
-
-def test_check_status_schedules_notification_via_loop(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    tray = StatusNotifierDesktopTray(MagicMock())
-    loop = _FakeLoop()
-    monkeypatch.setattr(tray, "_loop", loop)
-    tray._check_status()
-    assert len(loop.callbacks) == 1
-
-
-class _RecordingBus:
-    def __init__(self) -> None:
-        self.messages: list[Message] = []
-
-    async def call(self, message: Message) -> Message:
-        self.messages.append(message)
-        return Message(message_type=MessageType.METHOD_RETURN, reply_serial=1)
-
-
-def test_notify_status_sends_desktop_notification(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    controller = MagicMock()
-    controller.status = "running"
-    tray = StatusNotifierDesktopTray(controller)
-    bus = _RecordingBus()
-    monkeypatch.setattr(tray, "_bus", bus)
-    asyncio.run(tray._notify_status_async())
-    assert len(bus.messages) == 1
-    message = bus.messages[0]
-    assert message.destination == "org.freedesktop.Notifications"
-    assert message.path == "/org/freedesktop/Notifications"
-    assert message.interface == "org.freedesktop.Notifications"
-    assert message.member == "Notify"
-    assert message.body[4] == "Server is running."
-
-
-class _FailingBus:
-    async def call(self, message: Message) -> Message:
-        raise OSError("no notification daemon")
-
-
-def test_notify_status_swallows_bus_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    tray = StatusNotifierDesktopTray(MagicMock())
-    monkeypatch.setattr(tray, "_bus", _FailingBus())
-    asyncio.run(tray._notify_status_async())  # must not raise
-
-
-def test_notify_status_without_bus_is_noop() -> None:
-    tray = StatusNotifierDesktopTray(MagicMock())
-    asyncio.run(tray._notify_status_async())  # must not raise
-
-
-def test_send_status_notification_schedules_notify_task() -> None:
-    tray = StatusNotifierDesktopTray(MagicMock())
-
-    async def scenario() -> None:
-        tray._send_status_notification()
-        await asyncio.sleep(0)
-
-    asyncio.run(scenario())  # must not raise
+    assert tray._entries[1].action == controller.quit
 
 
 class _FakeBus:

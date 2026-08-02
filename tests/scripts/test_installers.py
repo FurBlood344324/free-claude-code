@@ -514,7 +514,7 @@ def test_install_sh_creates_linux_desktop_entry(
     assert f'Exec="{posix_harness.tool_bin}/fcc-desktop"' in desktop_text
     assert "Icon=free-claude-code" in desktop_text
     assert "Terminal=false" in desktop_text
-    assert "Categories=Network;Utility;" in desktop_text
+    assert "Categories=Utility;" in desktop_text
     assert "# X-FCC-Owner=io.github.alishahryar1.free-claude-code" in desktop_text
     assert desktop_file.stat().st_mode & 0o111
     assert f"fcc-desktop:--export-icon {icon}" in posix_harness.calls()

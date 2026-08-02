@@ -707,7 +707,7 @@ install_linux_desktop_entry() {
         printf 'Exec=%s\n' "$desktop_command"
         printf '%s\n' 'Icon=free-claude-code'
         printf '%s\n' 'Terminal=false'
-        printf '%s\n' 'Categories=Network;Utility;'
+        printf '%s\n' 'Categories=Utility;'
         printf '# %s\n' "$FCC_LINUX_OWNER_MARKER"
     } > "$desktop_file"
     chmod +x "$desktop_file"

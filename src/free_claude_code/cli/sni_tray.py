@@ -11,7 +11,6 @@ import os
 import sys
 import threading
 from collections.abc import Callable
-from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
@@ -30,9 +29,6 @@ _MENU_INTERFACE = "com.canonical.dbusmenu"
 _WATCHER_INTERFACE = "org.kde.StatusNotifierWatcher"
 _WATCHER_NAME = _WATCHER_INTERFACE
 _WATCHER_PATH = "/StatusNotifierWatcher"
-_NOTIFICATIONS_INTERFACE = "org.freedesktop.Notifications"
-_NOTIFICATIONS_NAME = _NOTIFICATIONS_INTERFACE
-_NOTIFICATIONS_PATH = "/org/freedesktop/Notifications"
 _ITEM_PATH = "/StatusNotifierItem"
 _MENU_PATH = "/MenuBar"
 _ITEM_BUS_NAME = f"org.kde.StatusNotifierItem-{os.getpid()}-1"
@@ -216,11 +212,8 @@ class StatusNotifierDesktopTray:
         self._bus: MessageBus | None = None
         self._shutdown: asyncio.Event | None = None
         self._entries = [
-            MenuEntry(1, "Open Admin", controller.open_admin),
-            MenuEntry(2, "Check Server Status", self._check_status),
-            MenuEntry(3, "Restart Server", controller.restart_server),
-            MenuEntry(4, "", separator=True),
-            MenuEntry(5, "Quit", controller.quit),
+            MenuEntry(1, "Open", controller.open_admin),
+            MenuEntry(2, "Quit", controller.quit),
         ]
 
     def run(self) -> None:
@@ -289,42 +282,6 @@ class StatusNotifierDesktopTray:
         if reply.message_type is not MessageType.METHOD_RETURN:
             raise RuntimeError(
                 f"StatusNotifierWatcher rejected registration: {reply.error_name}"
-            )
-
-    def _check_status(self) -> None:
-        """Queue a desktop notification with the current server status."""
-
-        loop = self._loop
-        if loop is not None:
-            loop.call_soon_threadsafe(self._send_status_notification)
-
-    def _send_status_notification(self) -> None:
-        with suppress(RuntimeError):
-            asyncio.create_task(self._notify_status_async())
-
-    async def _notify_status_async(self) -> None:
-        bus = self._bus
-        if bus is None:
-            return
-        with suppress(Exception):
-            await bus.call(
-                Message(
-                    destination=_NOTIFICATIONS_NAME,
-                    path=_NOTIFICATIONS_PATH,
-                    interface=_NOTIFICATIONS_INTERFACE,
-                    member="Notify",
-                    signature="susssasa{sv}i",
-                    body=[
-                        "free-claude-code",
-                        0,
-                        "",
-                        "Free Claude Code",
-                        f"Server is {self._controller.status}.",
-                        [],
-                        {},
-                        -1,
-                    ],
-                )
             )
 
     def _signal_shutdown(self) -> None:
