@@ -1,5 +1,6 @@
 """Platform-neutral lifecycle for the FCC desktop shell."""
 
+import signal
 import threading
 from collections.abc import Callable
 from typing import Protocol
@@ -113,6 +114,39 @@ class DesktopController:
 
     def _run_server(self) -> None:
         self._supervisor.run(open_admin_browser=False)
+
+
+class HeadlessDesktopTray:
+    """Keep the FCC server alive when the platform exposes no tray host."""
+
+    def __init__(self, controller: DesktopController) -> None:
+        self._controller = controller
+        self._stopped = threading.Event()
+
+    def run(self) -> None:
+        """Open the Admin UI, then block until the shell is stopped."""
+
+        self._controller.open_admin()
+        if threading.current_thread() is threading.main_thread():
+            previous = signal.signal(signal.SIGTERM, self._request_quit)
+            try:
+                self._wait_until_stopped()
+            finally:
+                signal.signal(signal.SIGTERM, previous)
+        else:
+            self._wait_until_stopped()
+
+    def stop(self) -> None:
+        self._stopped.set()
+
+    def _wait_until_stopped(self) -> None:
+        try:
+            self._stopped.wait()
+        except KeyboardInterrupt:
+            self._controller.quit()
+
+    def _request_quit(self, _signum: int, _frame: object) -> None:
+        self._controller.quit()
 
 
 def launch_desktop(tray_factory: DesktopTrayFactory) -> None:

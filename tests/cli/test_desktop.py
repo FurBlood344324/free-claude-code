@@ -1,11 +1,12 @@
 """Desktop shell lifecycle and singleton contracts."""
 
+import signal
 import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from free_claude_code.cli.commands import ServerStatus, ServerSupervisor
-from free_claude_code.cli.desktop import DesktopController
+from free_claude_code.cli.desktop import DesktopController, HeadlessDesktopTray
 from free_claude_code.config.settings import Settings
 from free_claude_code.core.interprocess_lock import InterprocessFileLock
 
@@ -270,3 +271,56 @@ def test_fresh_desktop_launch_disables_console_and_automatic_browser() -> None:
     assert shell.call_args.args[:2] == (supervisor, tray_factory)
     controller.run.assert_called_once_with()
     instance_lock.release.assert_called_once_with()
+
+
+def test_headless_tray_opens_admin_then_blocks_until_stopped() -> None:
+    opened = threading.Event()
+    controller = MagicMock()
+    controller.open_admin.side_effect = opened.set
+    tray = HeadlessDesktopTray(controller)
+
+    thread = threading.Thread(target=tray.run)
+    thread.start()
+
+    assert opened.wait(2)
+    controller.open_admin.assert_called_once_with()
+    assert thread.is_alive()
+
+    tray.stop()
+    thread.join(2)
+    assert not thread.is_alive()
+    assert tray._stopped.is_set()
+
+
+def test_headless_tray_turns_keyboard_interrupt_into_quit() -> None:
+    controller = MagicMock()
+    tray = HeadlessDesktopTray(controller)
+
+    with patch.object(tray._stopped, "wait", side_effect=KeyboardInterrupt):
+        tray._wait_until_stopped()
+
+    controller.quit.assert_called_once_with()
+
+
+def test_headless_tray_termination_signal_requests_quit() -> None:
+    controller = MagicMock()
+    tray = HeadlessDesktopTray(controller)
+
+    tray._request_quit(signal.SIGTERM, None)
+
+    controller.quit.assert_called_once_with()
+
+
+def test_headless_tray_run_restores_previous_sigterm_handler() -> None:
+    previous = signal.getsignal(signal.SIGTERM)
+    controller = MagicMock()
+    tray = HeadlessDesktopTray(controller)
+
+    stopper = threading.Thread(target=tray.stop)
+    stopper.start()
+    tray.run()
+    stopper.join()
+
+    assert signal.getsignal(signal.SIGTERM) is previous
+    controller.open_admin.assert_called_once_with()
+    assert tray._stopped.is_set()
