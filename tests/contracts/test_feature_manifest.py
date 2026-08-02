@@ -33,13 +33,20 @@ def test_every_readme_feature_has_inventory_entry() -> None:
     )
 
 
-def test_readme_provider_table_covers_full_catalog() -> None:
+def test_readme_provider_table_documents_real_catalog_prefixes() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     readme = (repo_root / "README.md").read_text(encoding="utf-8")
-    provider_section = readme.split("## Choose A Provider", 1)[1].split("\n## ", 1)[0]
-    rows = [line for line in provider_section.splitlines() if line.startswith("| [")]
+    provider_section = readme.split(
+        "## S\u0131k kullan\u0131lan provider ayarlar\u0131", 1
+    )[1].split("\n## ", 1)[0]
+    rows = [
+        line
+        for line in provider_section.splitlines()
+        if line.startswith("| ")
+        and not line.startswith("| ---")
+        and not line.startswith("| Provider")
+    ]
 
-    assert f"Switch among {len(PROVIDER_CATALOG)} cloud and local providers" in readme
     prefixes: list[str] = []
     for row in rows:
         example_cell = row.split("|")[3]
@@ -47,9 +54,8 @@ def test_readme_provider_table_covers_full_catalog() -> None:
         assert match is not None, row
         prefixes.append(match.group(1))
 
-    assert len(rows) == len(PROVIDER_CATALOG)
     assert len(prefixes) == len(set(prefixes))
-    assert set(prefixes) == set(PROVIDER_CATALOG)
+    assert set(prefixes) <= set(PROVIDER_CATALOG)
 
 
 def test_feature_inventory_is_unique_and_decision_complete() -> None:

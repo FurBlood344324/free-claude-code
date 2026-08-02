@@ -234,8 +234,7 @@ and [scripts/uninstall.ps1](scripts/uninstall.ps1) remove those exact desktop
 artifacts, the FCC uv tool, and the managed `~/.fcc/` tree from
 [config/paths.py](src/free_claude_code/config/paths.py); they do not remove
 uv, Claude Code, Codex, Pi, or uv-managed Python runtimes. [scripts/ci.sh](scripts/ci.sh) and
-[scripts/ci.ps1](scripts/ci.ps1) mirror [.github/workflows/tests.yml](.github/workflows/tests.yml)
-for local pre-push verification.
+[scripts/ci.ps1](scripts/ci.ps1) run the local pre-push verification sequence.
 
 [cli/entrypoints.py](src/free_claude_code/cli/entrypoints.py) starts the FastAPI server with Uvicorn.
 The shared `ServerSupervisor` migrates legacy env files when needed, loads cached
@@ -1496,8 +1495,8 @@ Live and local product tests live under [smoke/](smoke/). See
 failure classes, and examples. Smoke tests can launch subprocesses, call real
 providers, touch local model servers, and optionally send bot messages.
 
-CI is defined in [.github/workflows/tests.yml](.github/workflows/tests.yml). It
-enforces:
+The CI gate ([scripts/ci.sh](scripts/ci.sh) on macOS/Linux, [scripts/ci.ps1](scripts/ci.ps1) on Windows)
+and the repository checks enforce:
 
 - `Ban type ignore suppressions`;
 - `ruff-format`;
