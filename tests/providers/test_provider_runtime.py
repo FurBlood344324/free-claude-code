@@ -457,6 +457,7 @@ def test_create_provider_instantiates_each_builtin():
         provider_rate_window=11,
         provider_max_concurrency=3,
         sambanova_api_key="test_sambanova_key",
+        commandcode_api_key="test_commandcode_key",
     )
     cases = {
         "nvidia_nim": NvidiaNimProvider,
@@ -490,6 +491,7 @@ def test_create_provider_instantiates_each_builtin():
         "sambanova": OpenAIChatProvider,
         "kilo": KiloProvider,
         "cerebras": OpenAIChatProvider,
+        "commandcode": OpenAIChatProvider,
     }
     sentinel_admission = MagicMock(spec=ProviderAdmissionController)
     auth = MagicMock()

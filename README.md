@@ -47,9 +47,9 @@ Run your coding agents with free, paid, or local models. Choose and validate pro
 
 ## What You Get
 
-- Launch Claude Code with `fcc-claude`, Codex with `fcc-codex`, or Pi with `fcc-pi`.
+- Launch Claude Code with `claude-code` (automatic FCC server sharing), `fcc-claude`, Codex with `fcc-codex`, or Pi with `fcc-pi`.
 - Run FCC in the background from a desktop launcher on Windows or macOS.
-- Switch among 31 cloud and local providers from the Admin UI.
+- Switch among 32 cloud and local providers from the Admin UI.
 - Use each coding agent's native model picker.
 - Route Fable, Opus, Sonnet, Haiku, and fallback traffic to different models.
 - Keep streaming, tool use, reasoning, and image input across compatible models.
@@ -130,11 +130,20 @@ Use the port shown in your terminal if it differs from `8082`.
 
 ### 4. Run Your Coding Agent
 
-Claude Code:
+Claude Code with automatic server management:
+
+```bash
+claude-code
+claude-code --resume <session-id>
+```
+
+For a manually managed server, use `fcc-claude`:
 
 ```bash
 fcc-claude
 ```
+
+`claude-code` starts a shared `fcc-server` when needed, reuses a healthy FCC server, and stops only a server it started after the last `claude-code` session exits. The public `claude-code` command is the FCC wrapper; the upstream Claude Code binary remains `claude`.
 
 Codex:
 
@@ -148,7 +157,7 @@ Pi:
 fcc-pi
 ```
 
-All three launchers use the current Admin UI settings. Use the agent's model picker to choose from the models FCC exposes. Normal CLI arguments still work, for example:
+All launchers use the current Admin UI settings. Use the agent's model picker to choose from the models FCC exposes. Normal CLI arguments still work, for example:
 
 ```bash
 fcc-codex exec "hello"
@@ -195,6 +204,7 @@ fcc-codex exec "hello"
 | [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | `cloudflare/@cf/moonshotai/kimi-k2.6` |
 | [Z.ai](https://z.ai/manage-apikey/apikey-list) | `ZAI_API_KEY` | `zai/glm-5.2` |
 | [Ollama Cloud](https://ollama.com/settings/keys) | `OLLAMA_API_KEY` | `ollama_cloud/qwen3-coder:480b` |
+| [CommandCode AI](https://commandcode.ai/provider) | `COMMANDCODE_API_KEY` | `commandcode/<model-id>` |
 | [LM Studio](https://lmstudio.ai/) | `LM_STUDIO_BASE_URL` | `lmstudio/<model-id>` |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | `LLAMACPP_BASE_URL` | `llamacpp/<model-id>` |
 | [Ollama](https://ollama.com/) | `OLLAMA_BASE_URL` | `ollama/<model-tag>` |

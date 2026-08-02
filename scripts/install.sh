@@ -11,7 +11,7 @@ UV_INSTALL_URL="https://astral.sh/uv/install.sh"
 FCC_MACOS_BUNDLE_ID="io.github.alishahryar1.free-claude-code"
 FCC_MACOS_OWNER_FILE=".free-claude-code-owner"
 # Include retired entry points so updates reject older FCC processes before replacement.
-FCC_COMMANDS="fcc-desktop fcc-server fcc-claude fcc-codex fcc-pi fcc-init free-claude-code"
+FCC_COMMANDS="fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi fcc-init free-claude-code"
 
 dry_run=0
 voice_nim=0
@@ -510,7 +510,7 @@ configure_and_verify_free_claude_code() {
 
     if [ "$dry_run" -eq 1 ]; then
         print_command uv tool dir --bin
-        printf '+ verify fcc-desktop, fcc-server, fcc-claude, fcc-codex, and fcc-pi in the uv tool bin directory\n'
+        printf '+ verify fcc-desktop, fcc-server, fcc-claude, claude-code, fcc-codex, and fcc-pi in the uv tool bin directory\n'
         print_command fcc-server --version
         return 0
     fi
@@ -528,7 +528,7 @@ configure_and_verify_free_claude_code() {
     export PATH
     hash -r 2>/dev/null || true
 
-    for command_name in fcc-desktop fcc-server fcc-claude fcc-codex fcc-pi; do
+    for command_name in fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi; do
         [ -x "$tool_bin/$command_name" ] || fail "Free Claude Code installation did not create $tool_bin/$command_name."
     done
 
@@ -669,7 +669,8 @@ else
     else
         printf '\nFree Claude Code is installed and verified. Start the proxy with: fcc-server\n'
     fi
-    printf 'Run Claude Code with: fcc-claude\n'
+    printf 'Run Claude Code with: claude-code\n'
+    printf 'For manual server management, use: fcc-claude\n'
     printf 'Run Codex with: fcc-codex\n'
     if [ "$pi_available" -eq 1 ]; then
         printf 'Run Pi with: fcc-pi\n'

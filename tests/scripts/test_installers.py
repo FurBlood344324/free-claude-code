@@ -11,6 +11,7 @@ FCC_COMMANDS = (
     "fcc-desktop",
     "fcc-server",
     "fcc-claude",
+    "claude-code",
     "fcc-codex",
     "fcc-pi",
     "fcc-init",
@@ -99,11 +100,12 @@ if [ "${{1:-}}" = "tool" ] && [ "${{2:-}}" = "install" ]; then
     cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/fcc-server"
     cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/fcc-desktop"
     cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/fcc-claude"
+    cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/claude-code"
     cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/fcc-pi"
     if [ "$FAIL_STEP" != "fcc-missing" ]; then
         cp "$FAKE_FIXTURES/fcc-command.sh" "$FAKE_TOOL_BIN/fcc-codex"
     fi
-    chmod +x "$FAKE_TOOL_BIN"/fcc-*
+    chmod +x "$FAKE_TOOL_BIN"/fcc-* "$FAKE_TOOL_BIN/claude-code"
     exit 0
 fi
 if [ "${{1:-}}" = "tool" ] && [ "${{2:-}}" = "update-shell" ]; then

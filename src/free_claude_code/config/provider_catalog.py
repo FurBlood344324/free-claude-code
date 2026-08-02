@@ -49,6 +49,7 @@ SAMBANOVA_DEFAULT_BASE = "https://api.sambanova.ai/v1"
 # Kilo.ai gateway OpenAI-compatible Chat Completions API.
 KILO_DEFAULT_BASE = "https://api.kilo.ai/api/gateway"
 OPENAI_CODEX_DEFAULT_BASE = "https://chatgpt.com/backend-api/codex"
+COMMANDCODE_DEFAULT_BASE = "https://api.commandcode.ai/provider/v1"
 
 
 class ProviderAuthKind(StrEnum):
@@ -371,6 +372,15 @@ PROVIDER_CATALOG: dict[str, ProviderDescriptor] = {
         default_base_url=OLLAMA_DEFAULT_BASE,
         base_url_attr="ollama_base_url",
         local=True,
+    ),
+    "commandcode": ProviderDescriptor(
+        provider_id="commandcode",
+        display_name="CommandCode AI",
+        credential_env="COMMANDCODE_API_KEY",
+        credential_url="https://commandcode.ai/provider",
+        credential_attr="commandcode_api_key",
+        default_base_url=COMMANDCODE_DEFAULT_BASE,
+        proxy_attr="commandcode_proxy",
     ),
 }
 

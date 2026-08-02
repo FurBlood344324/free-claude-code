@@ -382,4 +382,17 @@ OPENAI_CHAT_PROFILES: dict[str, OpenAIChatProfile] = {
         normalize_base_url=True,
         reasoning_delta_field="reasoning",
     ),
+    "commandcode": OpenAIChatProfile(
+        _policy(
+            "COMMANDCODE",
+            ReasoningReplayMode.THINK_TAGS,
+            include_extra_body=True,
+            extra_body_validator=validate_extra_body_does_not_override_reasoning_fields,
+        ),
+        NamedEffortReasoning(
+            _LOW_TO_MAX,
+            disabled_value="none",
+            enabled_value="high",
+        ),
+    ),
 }
