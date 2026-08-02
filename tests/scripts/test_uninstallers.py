@@ -177,6 +177,16 @@ exec /bin/rm "$@"
 """,
     )
     _write_executable(
+        bin_dir / "pgrep",
+        """#!/bin/sh
+[ -n "${FCC_RUNNING_COMMAND:-}" ] || exit 1
+case "$*" in
+    *"$FCC_RUNNING_COMMAND"*) printf '4242\n'; exit 0 ;;
+    *) exit 1 ;;
+esac
+""",
+    )
+    _write_executable(
         bin_dir / "uname",
         """#!/bin/sh
 printf '%s\n' "$FAKE_UNAME"
@@ -193,6 +203,17 @@ printf '%s\n' "$FAKE_UNAME"
     desktop = home / "Desktop"
     desktop.mkdir()
     (desktop / "Free Claude Code.app").symlink_to(app, target_is_directory=True)
+    linux_share = home / ".local" / "share"
+    linux_applications = linux_share / "applications"
+    linux_icons = linux_share / "icons" / "hicolor" / "256x256" / "apps"
+    linux_applications.mkdir(parents=True)
+    linux_icons.mkdir(parents=True)
+    (linux_applications / "free-claude-code.desktop").write_text(
+        "[Desktop Entry]\nExec=/tmp/fcc-desktop\n"
+        "# X-FCC-Owner=io.github.alishahryar1.free-claude-code\n",
+        encoding="utf-8",
+    )
+    (linux_icons / "free-claude-code.png").write_text("fake icon\n", encoding="utf-8")
 
     env = os.environ.copy()
     env.update(
@@ -202,11 +223,23 @@ printf '%s\n' "$FAKE_UNAME"
             "CALL_LOG": str(log),
             "FAKE_TOOL_BIN": str(tool_bin),
             "FAKE_UNAME": "Darwin",
+            "FCC_RUNNING_COMMAND": "",
             "FAIL_STEP": "",
         }
     )
     env.pop("XDG_BIN_HOME", None)
+    env.pop("XDG_DATA_HOME", None)
     return PosixUninstallHarness(home, bin_dir, tool_bin, fcc_home, log, env)
+
+
+def _linux_desktop_paths(
+    harness: PosixUninstallHarness,
+) -> tuple[Path, Path]:
+    share = harness.home / ".local" / "share"
+    return (
+        share / "applications" / "free-claude-code.desktop",
+        share / "icons" / "hicolor" / "256x256" / "apps" / "free-claude-code.png",
+    )
 
 
 def test_uninstall_sh_removes_and_verifies_only_fcc(
@@ -231,6 +264,49 @@ def test_uninstall_sh_removes_and_verifies_only_fcc(
         f"rm:-rf {posix_uninstall_harness.home / 'Applications' / 'Free Claude Code.app'}",
         f"rm:-rf {posix_uninstall_harness.fcc_home}",
     ]
+    linux_desktop_file, linux_icon = _linux_desktop_paths(posix_uninstall_harness)
+    assert linux_desktop_file.exists()
+    assert linux_icon.exists()
+
+
+def test_uninstall_sh_removes_linux_desktop_entry(
+    posix_uninstall_harness: PosixUninstallHarness,
+) -> None:
+    posix_uninstall_harness.env["FAKE_UNAME"] = "Linux"
+    desktop_file, icon = _linux_desktop_paths(posix_uninstall_harness)
+
+    result = posix_uninstall_harness.run()
+
+    assert result.returncode == 0, result.stderr
+    assert not desktop_file.exists()
+    assert not icon.exists()
+    assert posix_uninstall_harness.calls()[-3:] == [
+        f"rm:-f {desktop_file}",
+        f"rm:-f {icon}",
+        f"rm:-rf {posix_uninstall_harness.fcc_home}",
+    ]
+
+
+def test_uninstall_sh_preserves_unmanaged_linux_desktop_entry(
+    posix_uninstall_harness: PosixUninstallHarness,
+) -> None:
+    posix_uninstall_harness.env["FAKE_UNAME"] = "Linux"
+    desktop_file, _ = _linux_desktop_paths(posix_uninstall_harness)
+    desktop_file.write_text(
+        "[Desktop Entry]\nName=Foreign\nExec=/usr/bin/foreign\n",
+        encoding="utf-8",
+    )
+
+    result = posix_uninstall_harness.run()
+
+    assert result.returncode == 0, result.stderr
+    assert "not managed by Free Claude Code" in result.stdout
+    assert desktop_file.read_text(encoding="utf-8") == (
+        "[Desktop Entry]\nName=Foreign\nExec=/usr/bin/foreign\n"
+    )
+    assert not any(
+        "free-claude-code.desktop" in call for call in posix_uninstall_harness.calls()
+    )
 
 
 def test_uninstall_sh_is_idempotent_when_tool_is_already_absent(

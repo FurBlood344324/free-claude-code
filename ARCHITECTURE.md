@@ -148,7 +148,7 @@ FCC optimizes for installed user workflows, not internal compatibility. The
 behavior that must be preserved is that these user-facing surfaces run correctly
 for real prompts against supported providers:
 
-- `fcc-server`, the Windows/macOS FCC Desktop shell, and the local Admin UI for
+- `fcc-server`, the Windows/macOS/Linux FCC Desktop shell, and the local Admin UI for
   configuring supported providers, model routing, auth, server tools, messaging,
   and diagnostics.
 - `fcc-claude`, Claude Code, and the Anthropic-compatible proxy behavior Claude
@@ -214,7 +214,7 @@ Console scripts are registered in [pyproject.toml](pyproject.toml):
 
 - `fcc-server` calls `free_claude_code.cli.entrypoints:serve`.
 - `fcc-desktop` is a GUI script calling
-  `free_claude_code.cli.desktop_entrypoint:launch` on Windows and macOS.
+  `free_claude_code.cli.desktop_entrypoint:launch` on Windows, macOS, and Linux.
 - `fcc-claude` calls `free_claude_code.cli.launchers.claude:launch`.
 - `fcc-codex` calls `free_claude_code.cli.launchers.codex:launch`.
 - `fcc-pi` calls `free_claude_code.cli.launchers.pi:launch`.
@@ -228,7 +228,8 @@ arguments transparently and runs server-independent management commands directly
 [scripts/install.sh](scripts/install.sh) and [scripts/install.ps1](scripts/install.ps1)
 install or update the uv tool plus optional voice extras. On Windows the
 installer owns the FCC desktop and Start-menu shortcuts; on macOS it owns the
-per-user application bundle and desktop link. [scripts/uninstall.sh](scripts/uninstall.sh)
+per-user application bundle and desktop link; on Linux it owns an XDG desktop
+entry in the user's applications menu. [scripts/uninstall.sh](scripts/uninstall.sh)
 and [scripts/uninstall.ps1](scripts/uninstall.ps1) remove those exact desktop
 artifacts, the FCC uv tool, and the managed `~/.fcc/` tree from
 [config/paths.py](src/free_claude_code/config/paths.py); they do not remove

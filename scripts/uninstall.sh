@@ -5,6 +5,7 @@ PACKAGE_NAME="free-claude-code"
 FCC_HOME_DIRNAME=".fcc"
 FCC_MACOS_BUNDLE_ID="io.github.alishahryar1.free-claude-code"
 FCC_MACOS_OWNER_FILE=".free-claude-code-owner"
+FCC_LINUX_OWNER_MARKER="X-FCC-Owner=io.github.alishahryar1.free-claude-code"
 # Include retired entry points so older installations are fully stopped and removed.
 FCC_COMMANDS="fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code cmd-code fcc-init free-claude-code"
 
@@ -241,6 +242,36 @@ remove_macos_desktop_app() {
     fi
 }
 
+linux_desktop_entry_is_fcc_owned() {
+    desktop_file=$1
+    [ -f "$desktop_file" ] || return 1
+    [ ! -L "$desktop_file" ] || return 1
+    while IFS= read -r line; do
+        [ "$line" = "# $FCC_LINUX_OWNER_MARKER" ] && return 0
+    done < "$desktop_file"
+    return 1
+}
+
+remove_linux_desktop_entry() {
+    [ "$(uname -s)" = "Linux" ] || return 0
+
+    data_dir="${XDG_DATA_HOME:-$HOME/.local/share}"
+    desktop_file="$data_dir/applications/free-claude-code.desktop"
+    icon_path="$data_dir/icons/hicolor/256x256/apps/free-claude-code.png"
+
+    if ! linux_desktop_entry_is_fcc_owned "$desktop_file"; then
+        if [ -e "$desktop_file" ] || [ -L "$desktop_file" ]; then
+            printf 'A desktop entry not managed by Free Claude Code exists at %s; leaving it unchanged.\n' "$desktop_file"
+        fi
+        return 0
+    fi
+
+    run rm -f "$desktop_file"
+    if [ -f "$icon_path" ]; then
+        run rm -f "$icon_path"
+    fi
+}
+
 purge_fcc_home() {
     fcc_home="$HOME/$FCC_HOME_DIRNAME"
     if [ ! -e "$fcc_home" ]; then
@@ -290,6 +321,7 @@ verify_fcc_commands_removed
 
 step "Removing the Free Claude Code desktop launcher"
 remove_macos_desktop_app
+remove_linux_desktop_entry
 
 step "Purging FCC config and data from ~/.fcc"
 purge_fcc_home

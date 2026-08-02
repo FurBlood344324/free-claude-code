@@ -65,6 +65,9 @@ Kurulumdan sonra yeni terminal aç veya shell ortamını yenile:
 source ~/.bashrc
 ```
 
+Linux'ta kurulum, **Free Claude Code** uygulamasını uygulama menüsüne
+ekler; menüden başlatarak proxy'yi arka planda çalıştırabilirsin.
+
 ### macOS
 
 Repo klasöründen kurulum:

@@ -11,6 +11,7 @@ UV_INSTALL_URL="https://astral.sh/uv/install.sh"
 COMMAND_CODE_PACKAGE="command-code"
 FCC_MACOS_BUNDLE_ID="io.github.alishahryar1.free-claude-code"
 FCC_MACOS_OWNER_FILE=".free-claude-code-owner"
+FCC_LINUX_OWNER_MARKER="X-FCC-Owner=io.github.alishahryar1.free-claude-code"
 # Include retired entry points so updates reject older FCC processes before replacement.
 FCC_COMMANDS="fcc-desktop fcc-server fcc-claude claude-code fcc-codex fcc-pi pi-code cmd-code fcc-init free-claude-code"
 
@@ -659,6 +660,59 @@ PLIST
     ln -s "$app_dir" "$desktop_link"
 }
 
+desktop_exec_quote() {
+    printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
+
+linux_desktop_entry_is_fcc_owned() {
+    desktop_file=$1
+    [ -f "$desktop_file" ] || return 1
+    [ ! -L "$desktop_file" ] || return 1
+    while IFS= read -r line; do
+        [ "$line" = "# $FCC_LINUX_OWNER_MARKER" ] && return 0
+    done < "$desktop_file"
+    return 1
+}
+
+install_linux_desktop_entry() {
+    [ "$(uname -s)" = "Linux" ] || return 0
+
+    data_dir="${XDG_DATA_HOME:-$HOME/.local/share}"
+    applications_dir="$data_dir/applications"
+    icons_dir="$data_dir/icons/hicolor/256x256/apps"
+    desktop_file="$applications_dir/free-claude-code.desktop"
+    icon_path="$icons_dir/free-claude-code.png"
+
+    if [ -e "$desktop_file" ] && ! linux_desktop_entry_is_fcc_owned "$desktop_file"; then
+        fail "A desktop entry not managed by Free Claude Code already exists at $desktop_file. Move it, then rerun the installer."
+    fi
+
+    if [ "$dry_run" -eq 1 ]; then
+        print_command mkdir -p "$applications_dir" "$icons_dir"
+        print_command fcc-desktop --export-icon "$icon_path"
+        printf '+ write %s\n' "$desktop_file"
+        return 0
+    fi
+
+    mkdir -p "$applications_dir" "$icons_dir"
+    run "$tool_bin/fcc-desktop" --export-icon "$icon_path"
+    [ -f "$icon_path" ] || fail "Free Claude Code did not export its Linux desktop icon to $icon_path."
+
+    desktop_command=$(desktop_exec_quote "$tool_bin/fcc-desktop")
+    {
+        printf '%s\n' '[Desktop Entry]'
+        printf '%s\n' 'Type=Application'
+        printf '%s\n' 'Name=Free Claude Code'
+        printf '%s\n' 'Comment=Local proxy connecting coding agents to OpenAI-compatible AI providers'
+        printf 'Exec=%s\n' "$desktop_command"
+        printf '%s\n' 'Icon=free-claude-code'
+        printf '%s\n' 'Terminal=false'
+        printf '%s\n' 'Categories=Network;Utility;'
+        printf '# %s\n' "$FCC_LINUX_OWNER_MARKER"
+    } > "$desktop_file"
+    chmod +x "$desktop_file"
+}
+
 parse_args "$@"
 validate_args
 add_known_bin_directories
@@ -693,20 +747,33 @@ install_free_claude_code
 step "Configuring PATH and verifying Free Claude Code"
 configure_and_verify_free_claude_code
 
-if [ "$(uname -s)" = "Darwin" ]; then
-    step "Installing the Free Claude Code desktop launcher"
-    install_macos_desktop_app
-fi
+case "$(uname -s)" in
+    Darwin)
+        step "Installing the Free Claude Code desktop launcher"
+        install_macos_desktop_app
+        ;;
+    Linux)
+        step "Installing the Free Claude Code desktop launcher"
+        install_linux_desktop_entry
+        ;;
+esac
 
 if [ "$dry_run" -eq 1 ]; then
     printf '\nDry run complete. No changes were made.\n'
 else
-    if [ "$(uname -s)" = "Darwin" ]; then
-        printf '\nFree Claude Code is installed and verified. Open Free Claude Code from Applications or the desktop to run it in the background.\n'
-        printf 'For terminal use, start the proxy with: fcc-server\n'
-    else
-        printf '\nFree Claude Code is installed and verified. Start the proxy with: fcc-server\n'
-    fi
+    case "$(uname -s)" in
+        Darwin)
+            printf '\nFree Claude Code is installed and verified. Open Free Claude Code from Applications or the desktop to run it in the background.\n'
+            printf 'For terminal use, start the proxy with: fcc-server\n'
+            ;;
+        Linux)
+            printf '\nFree Claude Code is installed and verified. Open Free Claude Code from your application menu to run it in the background.\n'
+            printf 'For terminal use, start the proxy with: fcc-server\n'
+            ;;
+        *)
+            printf '\nFree Claude Code is installed and verified. Start the proxy with: fcc-server\n'
+            ;;
+    esac
     printf 'Run Claude Code with: claude-code\n'
     printf 'For manual server management, use: fcc-claude\n'
     printf 'Run Codex with: fcc-codex\n'

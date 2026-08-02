@@ -1,6 +1,7 @@
 """Packaged desktop icon and export contracts."""
 
 import struct
+import sys
 from pathlib import Path
 
 import pytest
@@ -55,3 +56,81 @@ def test_desktop_entrypoint_rejects_unknown_arguments(
 
     assert exc_info.value.code == 2
     assert "Usage: fcc-desktop" in capsys.readouterr().err
+
+
+def test_desktop_entrypoint_launches_tray_on_linux(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    launched: list[bool] = []
+
+    class FakeTrayModule:
+        @staticmethod
+        def launch() -> None:
+            launched.append(True)
+
+    monkeypatch.setattr(desktop_entrypoint.sys, "platform", "linux")
+    monkeypatch.setitem(
+        sys.modules,
+        "free_claude_code.cli.desktop_tray",
+        FakeTrayModule(),
+    )
+
+    desktop_entrypoint.launch([])
+
+    assert launched == [True]
+
+
+@pytest.mark.parametrize("platform", ["freebsd", "emscripten", "cygwin"])
+def test_desktop_entrypoint_rejects_unsupported_platforms(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    platform: str,
+) -> None:
+    monkeypatch.setattr(desktop_entrypoint.sys, "platform", platform)
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop_entrypoint.launch([])
+
+    assert exc_info.value.code == 1
+    assert (
+        "FCC Desktop is supported on Windows, macOS, and Linux."
+        in capsys.readouterr().err
+    )
+
+
+def test_desktop_entrypoint_reports_missing_tray_dependencies_on_linux(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(desktop_entrypoint.sys, "platform", "linux")
+
+    def missing_backend(name: str, *args: object, **kwargs: object) -> object:
+        raise ModuleNotFoundError("No module named 'gi'")
+
+    monkeypatch.setattr("builtins.__import__", missing_backend)
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop_entrypoint.launch([])
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr().err
+    assert "graphical system tray on Linux" in captured
+    assert "No module named 'gi'" in captured
+
+
+def test_desktop_entrypoint_reports_headless_linux_display(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(desktop_entrypoint.sys, "platform", "linux")
+
+    def no_display(name: str, *args: object, **kwargs: object) -> object:
+        raise RuntimeError('Bad display name ""')
+
+    monkeypatch.setattr("builtins.__import__", no_display)
+
+    with pytest.raises(SystemExit) as exc_info:
+        desktop_entrypoint.launch([])
+
+    assert exc_info.value.code == 1
+    assert "X11 session" in capsys.readouterr().err

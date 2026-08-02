@@ -363,6 +363,7 @@ printf '%s\n' "${FAKE_UNAME:-Linux}"
         }
     )
     env.pop("XDG_BIN_HOME", None)
+    env.pop("XDG_DATA_HOME", None)
     return PosixHarness(tmp_path, bin_dir, fixtures, tool_bin, log, env)
 
 
@@ -388,10 +389,22 @@ def test_install_sh_fresh_install_is_verified(posix_harness: PosixHarness) -> No
         for call in calls
     )
     assert not any(call.startswith("git:") for call in calls)
-    assert calls[-3:] == [
+    icon = (
+        posix_harness.root
+        / "home"
+        / ".local"
+        / "share"
+        / "icons"
+        / "hicolor"
+        / "256x256"
+        / "apps"
+        / "free-claude-code.png"
+    )
+    assert calls[-4:] == [
         "uv:tool update-shell",
         "uv:tool dir --bin",
         "fcc-server:--version",
+        f"fcc-desktop:--export-icon {icon}",
     ]
 
 
@@ -478,6 +491,84 @@ def test_install_sh_preserves_unrelated_macos_desktop_link(
     assert result.returncode == 0, result.stderr
     assert "non-FCC link" in result.stdout
     assert desktop_link.readlink() == unrelated
+
+
+def _linux_desktop_paths(posix_harness: PosixHarness) -> tuple[Path, Path]:
+    share = posix_harness.root / "home" / ".local" / "share"
+    return (
+        share / "applications" / "free-claude-code.desktop",
+        share / "icons" / "hicolor" / "256x256" / "apps" / "free-claude-code.png",
+    )
+
+
+def test_install_sh_creates_linux_desktop_entry(
+    posix_harness: PosixHarness,
+) -> None:
+    result = posix_harness.run()
+
+    assert result.returncode == 0, result.stderr
+    desktop_file, icon = _linux_desktop_paths(posix_harness)
+    assert icon.read_bytes() == b"fake icon\n"
+    desktop_text = desktop_file.read_text(encoding="utf-8")
+    assert "Type=Application" in desktop_text
+    assert f'Exec="{posix_harness.tool_bin}/fcc-desktop"' in desktop_text
+    assert "Icon=free-claude-code" in desktop_text
+    assert "Terminal=false" in desktop_text
+    assert "Categories=Network;Utility;" in desktop_text
+    assert "# X-FCC-Owner=io.github.alishahryar1.free-claude-code" in desktop_text
+    assert desktop_file.stat().st_mode & 0o111
+    assert f"fcc-desktop:--export-icon {icon}" in posix_harness.calls()
+    assert "application menu" in result.stdout
+
+
+def test_install_sh_stops_if_linux_icon_export_fails(
+    posix_harness: PosixHarness,
+) -> None:
+    result = posix_harness.run(fail_step="desktop-icon-export")
+
+    assert result.returncode != 0
+    assert "Command failed with exit code 37" in result.stderr
+    desktop_file, _ = _linux_desktop_paths(posix_harness)
+    assert not desktop_file.exists()
+
+
+def test_install_sh_rejects_unmanaged_linux_desktop_entry(
+    posix_harness: PosixHarness,
+) -> None:
+    desktop_file, _ = _linux_desktop_paths(posix_harness)
+    desktop_file.parent.mkdir(parents=True)
+    desktop_file.write_text(
+        "[Desktop Entry]\nName=Foreign\nExec=/usr/bin/foreign\n",
+        encoding="utf-8",
+    )
+
+    result = posix_harness.run()
+
+    assert result.returncode != 0
+    assert "not managed by Free Claude Code" in result.stderr
+    assert desktop_file.read_text(encoding="utf-8") == (
+        "[Desktop Entry]\nName=Foreign\nExec=/usr/bin/foreign\n"
+    )
+    assert not any(call.startswith("fcc-desktop:") for call in posix_harness.calls())
+
+
+def test_install_sh_replaces_its_own_linux_desktop_entry(
+    posix_harness: PosixHarness,
+) -> None:
+    desktop_file, _ = _linux_desktop_paths(posix_harness)
+    desktop_file.parent.mkdir(parents=True)
+    desktop_file.write_text(
+        "[Desktop Entry]\nExec=/old/bin\n"
+        "# X-FCC-Owner=io.github.alishahryar1.free-claude-code\n",
+        encoding="utf-8",
+    )
+
+    result = posix_harness.run()
+
+    assert result.returncode == 0, result.stderr
+    assert f'Exec="{posix_harness.tool_bin}/fcc-desktop"' in desktop_file.read_text(
+        encoding="utf-8"
+    )
 
 
 @pytest.mark.parametrize("uv_version", ("0.11.16", "0.11.16+build.1"))

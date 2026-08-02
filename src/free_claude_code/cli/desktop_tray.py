@@ -1,4 +1,4 @@
-"""pystray adapter for the Windows tray and macOS menu bar."""
+"""pystray adapter for the Windows tray, macOS menu bar, and Linux status area."""
 
 from io import BytesIO
 
